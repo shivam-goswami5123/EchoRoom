@@ -8,6 +8,50 @@
         margin: 0;
         padding-bottom: 3rem;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+      #messages-container {
+        display: flex;
+        flex-grow: 1;
+        overflow-y: auto;
+      }
+      .message-section {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        display: flex;
+        flex-direction: column;
+      }
+      #sent-messages, #received-messages {
+        flex: 1;
+        padding: 0;
+        margin: 0;
+        list-style-type: none;
+      }
+      #sent-messages {
+        background-color: #f0f8ff;
+      }
+      #received-messages {
+        background-color: #fff8dc;
+      }
+      #sent-messages > li, #received-messages > li {
+        padding: 0.5rem 1rem;
+        word-wrap: break-word;
+      }
+      #sent-messages > li:nth-child(odd) {
+        background: #e6f7ff;
+      }
+      #received-messages > li:nth-child(odd) {
+        background: #ffffe6;
+      }
+      .message-header {
+        background: rgba(0, 0, 0, 0.1);
+        padding: 0.5rem;
+        text-align: center;
+        font-weight: bold;
       }
       #form {
         background: rgba(0, 0, 0, 0.15);
@@ -40,17 +84,6 @@
         outline: none;
         color: #fff;
       }
-      #messages {
-        list-style-type: none;
-        margin: 0;
-        padding: 0;
-      }
-      #messages > li {
-        padding: 0.5rem 1rem;
-      }
-      #messages > li:nth-child(odd) {
-        background: #efefef;
-      }
       #password-modal {
         position: fixed;
         top: 0;
@@ -72,7 +105,16 @@
     </style>
   </head>
   <body>
-    <ul id="messages"></ul>
+    <div id="messages-container">
+      <div class="message-section">
+        <div class="message-header">Sent</div>
+        <ul id="sent-messages"></ul>
+      </div>
+      <div class="message-section">
+        <div class="message-header">Received</div>
+        <ul id="received-messages"></ul>
+      </div>
+    </div>
     <form id="form" action="">
       <input id="input" autocomplete="off" />
       <button>Send</button>
@@ -91,91 +133,81 @@
       const socket = io();
       const form = document.getElementById('form');
       const input = document.getElementById('input');
-      const messages = document.getElementById('messages');
+      const sentMessages = document.getElementById('sent-messages');
+      const receivedMessages = document.getElementById('received-messages');
       const toggleButton = document.getElementById('toggle-btn');
       const passwordModal = document.getElementById('password-modal');
       const passwordInput = document.getElementById('password-input');
       const passwordSubmit = document.getElementById('password-submit');
 
       let isAuthenticated = false;
+      let socketId = null;
 
-      // Function to show the password modal
       const showPasswordModal = () => {
         passwordModal.style.display = 'flex';
         passwordInput.value = '';
       };
 
-      // Function to hide the password modal
       const hidePasswordModal = () => {
         passwordModal.style.display = 'none';
       };
 
-      // Function to handle authentication
       const authenticate = () => {
         showPasswordModal();
         passwordSubmit.onclick = () => {
           const password = passwordInput.value;
-          console.log('Submitting password for authentication...');
           socket.emit('authenticate', password);
         };
       };
 
-      // Listen for authentication response
       socket.on('authenticated', (data) => {
         if (data.success) {
           isAuthenticated = true;
-          console.log('User authenticated successfully.');
           hidePasswordModal();
           toggleButton.innerText = 'Disconnect';
         } else {
-          console.log('Authentication failed. Wrong password.');
           alert(data.message);
-          showPasswordModal(); // Retry if authentication fails
+          showPasswordModal();
         }
       });
 
-      // Handle form submission
+      socket.on('connect', () => {
+        socketId = socket.id;
+        authenticate();
+      });
+
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         if (isAuthenticated && input.value) {
-          console.log('Sending message:', input.value);
-          socket.emit('chat message', input.value);
+          const message = { text: input.value, sender: socketId };
+          socket.emit('chat message', message);
+          const item = document.createElement('li');
+          item.textContent = input.value;
+          sentMessages.appendChild(item);
           input.value = '';
-        } else {
-          console.log('Cannot send message: User not authenticated.');
         }
       });
 
       socket.on('chat message', (msg) => {
-        const item = document.createElement('li');
-        item.textContent = msg;
-        messages.appendChild(item);
-        window.scrollTo(0, document.body.scrollHeight);
+        if (msg.sender !== socketId) {
+          const item = document.createElement('li');
+          item.textContent = msg.text;
+          receivedMessages.appendChild(item);
+        }
       });
 
-      // Handle toggle button for connect/disconnect
       toggleButton.addEventListener('click', (e) => {
         e.preventDefault();
         if (socket.connected) {
-          console.log('Disconnecting...');
           isAuthenticated = false;
           toggleButton.innerText = 'Connect';
           socket.disconnect();
         } else {
-          console.log('Attempting to reconnect...');
-          socket.connect(); // Reconnect
+          socket.connect();
         }
       });
 
-      // Authenticate on connection
-      socket.on('connect', () => {
-        console.log('Socket connected. Authenticating...');
-        authenticate();
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Socket disconnected.');
-      });
+      socket.on('disconnect', () => console.log('Socket disconnected.'));
     </script>
   </body>
 </html>

@@ -2,6 +2,9 @@ const express = require('express');
 const { createServer } = require('node:http');
 const { join } = require('node:path');
 const { Server } = require('socket.io');
+const dotenv = require('dotenv');
+
+dotenv.config();
 
 const app = express();
 const server = createServer(app);
@@ -10,7 +13,7 @@ const io = new Server(server, {
 });
 
 // Define the stored password
-const PASSWORD = 'mySecurePassword';
+const PASSWORD = process.env.PASSWORD || 'password';
 
 app.get('/', (req, res) => {
     res.sendFile(join(__dirname, 'index.html'));
